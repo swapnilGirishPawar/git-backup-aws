@@ -1,4 +1,4 @@
-name: PR Backup
+name: Backup After PR Merge
 
 on:
   pull_request:
@@ -12,20 +12,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Create Bundle
         run: |
-          git bundle create repo.bundle --all
+          git bundle create backup.bundle --all
 
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Upload
+      - name: Upload To S3
         run: |
-          aws s3 cp repo.bundle \
-          s3://git-backups-company/pr-backups/repo-${{ github.run_id }}.bundle
+          aws s3 cp backup.bundle \
+          s3://swapnil-git-backups/pr-backups/pr-${{ github.run_number }}.bundle
+
+          
