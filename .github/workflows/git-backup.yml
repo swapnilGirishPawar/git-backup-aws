@@ -1,52 +1,52 @@
 name: Backup Master Before PR Merge
 
 on:
-pull_request:
-branches:
-- master
-types:
-- opened
-- synchronize
-- reopened
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
-backup:
-runs-on: ubuntu-latest
+  backup:
+    runs-on: ubuntu-latest
 
-permissions:
-  contents: read
+    permissions:
+      contents: read
 
-steps:
-  - name: Checkout Repository
-    uses: actions/checkout@v4
-    with:
-      fetch-depth: 0
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  - name: Fetch Latest Master
-    run: |
-      git fetch origin master
+      - name: Fetch Latest Master
+        run: |
+          git fetch origin master
 
-  - name: Generate Bundle Name
-    id: bundle
-    run: |
-      TIMESTAMP=$(date +"%d-%m-%Y_%H-%M-%S")
-      BUNDLE_NAME="PR-${{ github.event.pull_request.number }}_${TIMESTAMP}.bundle"
+      - name: Generate Bundle Name
+        id: bundle
+        run: |
+          TIMESTAMP=$(date +"%d-%m-%Y_%H-%M-%S")
+          BUNDLE_NAME="PR-${{ github.event.pull_request.number }}_${TIMESTAMP}.bundle"
 
-      echo "bundle_name=$BUNDLE_NAME" >> $GITHUB_OUTPUT
+          echo "bundle_name=$BUNDLE_NAME" >> $GITHUB_OUTPUT
 
-  - name: Create Master Bundle
-    run: |
-      git bundle create "${{ steps.bundle.outputs.bundle_name }}" origin/master
+      - name: Create Master Bundle
+        run: |
+          git bundle create "${{ steps.bundle.outputs.bundle_name }}" origin/master
 
-  - name: Configure AWS Credentials
-    uses: aws-actions/configure-aws-credentials@v4
-    with:
-      aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-      aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-      aws-region: ap-south-1
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ap-south-1
 
-  - name: Upload Bundle To S3
-    run: |
-      aws s3 cp \
-        "${{ steps.bundle.outputs.bundle_name }}" \
-        "s3://swapnil-git-backups/pr-backups/PR-${{ github.event.pull_request.number }}/${{ steps.bundle.outputs.bundle_name }}"
+      - name: Upload Bundle To S3
+        run: |
+          aws s3 cp \
+            "${{ steps.bundle.outputs.bundle_name }}" \
+            "s3://swapnil-git-backups/pr-backups/PR-${{ github.event.pull_request.number }}/${{ steps.bundle.outputs.bundle_name }}"
