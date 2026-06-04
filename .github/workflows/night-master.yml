@@ -1,0 +1,60 @@
+name: Nightly Master Backup
+
+on:
+  schedule:
+    # 03:30 AM IST (22:00 UTC)
+    - cron: '0 22 * * *'
+
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch Latest Master
+        run: |
+          git fetch origin master:master
+
+      - name: Generate Bundle Name
+        id: bundle
+        run: |
+          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+          YEAR=$(date +"%Y")
+          MONTH=$(date +"%m")
+
+          BUNDLE_NAME="MASTER_NIGHTLY_${TIMESTAMP}.bundle"
+
+          echo "bundle_name=$BUNDLE_NAME" >> $GITHUB_OUTPUT
+          echo "year=$YEAR" >> $GITHUB_OUTPUT
+          echo "month=$MONTH" >> $GITHUB_OUTPUT
+
+      - name: Create Master Bundle
+        run: |
+          git bundle create "${{ steps.bundle.outputs.bundle_name }}" master
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ap-south-1
+
+      - name: Upload Bundle To S3
+        run: |
+          aws s3 cp \
+            "${{ steps.bundle.outputs.bundle_name }}" \
+            "s3://swapnil-git-backups/nightly/${{ steps.bundle.outputs.year }}/${{ steps.bundle.outputs.month }}/${{ steps.bundle.outputs.bundle_name }}"
+
+      - name: Verify Upload
+        run: |
+          aws s3 ls \
+            "s3://swapnil-git-backups/nightly/${{ steps.bundle.outputs.year }}/${{ steps.bundle.outputs.month }}/${{ steps.bundle.outputs.bundle_name }}"
