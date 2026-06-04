@@ -1,34 +1,53 @@
-name: Backup After PR Merge
+name: Backup Master Before PR Merge
 
 on:
-  pull_request:
-    types:
-      - closed
+pull_request:
+branches:
+- master
+types:
+- opened
+- synchronize
+- reopened
 
 jobs:
-  backup:
-    if: github.event.pull_request.merged == true
+backup:
+runs-on: ubuntu-latest
 
-    runs-on: ubuntu-latest
+```
+permissions:
+  contents: read
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+steps:
+  - name: Checkout Repository
+    uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
 
-      - name: Create Bundle
-        run: |
-          git bundle create backup.bundle --all
+  - name: Fetch Latest Master
+    run: |
+      git fetch origin master
 
-      - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-region: ap-south-1
+  - name: Generate Bundle Name
+    id: bundle
+    run: |
+      TIMESTAMP=$(date +"%d-%m-%Y_%H-%M-%S")
+      BUNDLE_NAME="PR-${{ github.event.pull_request.number }}_${TIMESTAMP}.bundle"
 
-      - name: Upload To S3
-        run: |
-          aws s3 cp backup.bundle \
-          s3://swapnil-git-backups/pr-backups/pr-${{ github.run_number }}.bundle
+      echo "bundle_name=$BUNDLE_NAME" >> $GITHUB_OUTPUT
+
+  - name: Create Master Bundle
+    run: |
+      git bundle create "${{ steps.bundle.outputs.bundle_name }}" origin/master
+
+  - name: Configure AWS Credentials
+    uses: aws-actions/configure-aws-credentials@v4
+    with:
+      aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+      aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+      aws-region: ap-south-1
+
+  - name: Upload Bundle To S3
+    run: |
+      aws s3 cp \
+        "${{ steps.bundle.outputs.bundle_name }}" \
+        "s3://swapnil-git-backups/pr-backups/PR-${{ github.event.pull_request.number }}/${{ steps.bundle.outputs.bundle_name }}"
