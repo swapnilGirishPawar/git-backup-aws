@@ -1,0 +1,31 @@
+name: PR Backup
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  backup:
+    if: github.event.pull_request.merged == true
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Bundle
+        run: |
+          git bundle create repo.bundle --all
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ap-south-1
+
+      - name: Upload
+        run: |
+          aws s3 cp repo.bundle \
+          s3://git-backups-company/pr-backups/repo-${{ github.run_id }}.bundle
